@@ -1,0 +1,21 @@
+   Compiling crashy v0.1.0 (/work/crashy)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.18s
+     Running unittests src/lib.rs (target/debug/build/crashy/bf4caf1a46503798/out/crashy-bf4caf1a46503798)
+{ "type": "suite", "event": "started", "test_count": 1 }
+{ "type": "test", "event": "started", "name": "tests::it_works" }
+{ "type": "test", "name": "tests::it_works", "event": "ok", "exec_time": 0.000000125 }
+{ "type": "suite", "event": "ok", "passed": 1, "failed": 0, "ignored": 0, "measured": 0, "filtered_out": 0, "exec_time": 0.000142458 }
+     Running tests/crash.rs (target/debug/build/crashy/fe063ef5b44db3b0/out/crash-fe063ef5b44db3b0)
+{ "type": "suite", "event": "started", "test_count": 2 }
+{ "type": "test", "event": "started", "name": "aborts" }
+{ "type": "test", "event": "started", "name": "quick" }
+{ "type": "test", "name": "quick", "event": "ok", "exec_time": 0.000000625 }
+error: test failed, to rerun pass `--test crash`
+
+Caused by:
+  process didn't exit successfully: `/work/crashy/target/debug/build/crashy/fe063ef5b44db3b0/out/crash-fe063ef5b44db3b0 -Z unstable-options --format json --report-time` (signal: 6, SIGABRT: process abort signal)
+   Doc-tests crashy
+{ "type": "suite", "event": "started", "test_count": 0 }
+{ "type": "suite", "event": "ok", "passed": 0, "failed": 0, "ignored": 0, "measured": 0, "filtered_out": 0, "exec_time": 0.000008292 }
+error: 1 target failed:
+    `--test crash`

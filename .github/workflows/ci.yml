@@ -1,0 +1,42 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - run: cargo fmt --check
+      - run: cargo clippy --all-targets -- -D warnings
+      - run: cargo test
+
+  # Run this project's tests through cargo tparse, and write the report to
+  # the step summary.
+  tparse:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@nightly
+      - run: cargo install --path .
+      - name: Test
+        run: |
+          set -o pipefail
+          cargo +nightly test --no-fail-fast -- -Z unstable-options --format json 2>&1 \
+            | tee test.out \
+            | cargo tparse --progress
+      - name: Summary
+        if: always()
+        run: cargo tparse --format markdown < test.out >> "$GITHUB_STEP_SUMMARY" || true

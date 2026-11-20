@@ -1,0 +1,46 @@
+   Compiling my-tool v0.1.0 (/work/my-tool)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.41s
+     Running unittests src/lib.rs (target/debug/build/my-tool/784ac0b59fe3dd38/out/mylib-784ac0b59fe3dd38)
+{ "type": "suite", "event": "started", "test_count": 7 }
+{ "type": "test", "event": "started", "name": "tests::ignored_reason" }
+{ "type": "test", "event": "started", "name": "tests::no_panic" }
+{ "type": "test", "event": "started", "name": "tests::ok_one" }
+{ "type": "test", "event": "started", "name": "tests::prints_cargo_like" }
+{ "type": "test", "event": "started", "name": "tests::result_err" }
+{ "type": "test", "event": "started", "name": "tests::wrong_panic" }
+{ "type": "test", "event": "started", "name": "tests::ünïcödé_名前" }
+{ "type": "test", "name": "tests::ignored_reason", "event": "ignored", "message": "needs network" }
+{ "type": "test", "name": "tests::no_panic", "event": "failed", "message": "test did not panic as expected at src/lib.rs:9:32" }
+{ "type": "test", "name": "tests::ok_one", "event": "ok" }
+{ "type": "test", "name": "tests::result_err", "event": "failed", "stdout": "Error: \"bad result\"\n" }
+{ "type": "test", "name": "tests::prints_cargo_like", "event": "ok" }
+{ "type": "test", "name": "tests::wrong_panic", "event": "failed", "stdout": "\nthread 'tests::wrong_panic' (1) panicked at src/lib.rs:8:67:\nbang\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n", "message": "panic did not contain expected string\n      panic message: \"bang\"\n expected substring: \"boom\"" }
+{ "type": "test", "name": "tests::ünïcödé_名前", "event": "failed", "stdout": "\nthread 'tests::ünïcödé_名前' (1) panicked at src/lib.rs:10:33:\nunicode fail\n" }
+{ "type": "suite", "event": "failed", "passed": 2, "failed": 4, "ignored": 1, "measured": 0, "filtered_out": 0, "exec_time": 0.000349875 }
+error: test failed, to rerun pass `--lib`
+     Running unittests src/main.rs (target/debug/build/my-tool/5c7a1681dc47efb6/out/mt-5c7a1681dc47efb6)
+{ "type": "suite", "event": "started", "test_count": 1 }
+{ "type": "test", "event": "started", "name": "t::bin_fails" }
+{ "type": "test", "name": "t::bin_fails", "event": "failed", "stdout": "\nthread 't::bin_fails' (1) panicked at src/main.rs:2:47:\nassertion `left == right` failed\n  left: 1\n right: 2\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n" }
+{ "type": "suite", "event": "failed", "passed": 0, "failed": 1, "ignored": 0, "measured": 0, "filtered_out": 0, "exec_time": 0.0002135 }
+error: test failed, to rerun pass `--bin mt`
+     Running tests/it.rs (target/debug/build/my-tool/629a6611e494d6c8/out/it-629a6611e494d6c8)
+{ "type": "suite", "event": "started", "test_count": 2 }
+{ "type": "test", "event": "started", "name": "it_fails" }
+{ "type": "test", "event": "started", "name": "it_passes" }
+{ "type": "test", "name": "it_passes", "event": "ok" }
+{ "type": "test", "name": "it_fails", "event": "failed", "stdout": "to stderr\n\nthread 'it_fails' (1) panicked at tests/it.rs:2:49:\nit boom\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n" }
+{ "type": "suite", "event": "failed", "passed": 1, "failed": 1, "ignored": 0, "measured": 0, "filtered_out": 0, "exec_time": 0.000190708 }
+error: test failed, to rerun pass `--test it`
+   Doc-tests mylib
+{ "type": "suite", "event": "started", "test_count": 1 }
+{ "type": "test", "event": "started", "name": "src/lib.rs - two (line 1)" }
+{ "type": "test", "name": "src/lib.rs - two (line 1)", "event": "failed", "stdout": "Test executable failed (exit status: 101).\n\nstderr:\n\nthread 'main' (1) panicked at /tmp/rustdoctest/doctest_bundle_2024.rs:6:1:\nassertion `left == right` failed\n  left: 2\n right: 3\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n\n" }
+{ "type": "suite", "event": "failed", "passed": 0, "failed": 1, "ignored": 0, "measured": 0, "filtered_out": 0, "exec_time": 0.003360333 }
+{ "type": "report", "total_time": 0.424776334, "compilation_time": 0.174219125 }
+error: doctest failed, to rerun pass `--doc`
+error: 4 targets failed:
+    `--lib`
+    `--bin mt`
+    `--test it`
+    `--doc`
