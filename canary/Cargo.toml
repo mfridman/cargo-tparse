@@ -1,0 +1,9 @@
+# Tests with known results, to find changes in the libtest JSON format. See
+# tests/canary.rs. This crate is not published.
+[package]
+name = "canary"
+version = "0.0.0"
+edition = "2024"
+publish = false
+
+[workspace]

@@ -1,0 +1,17 @@
+**FAIL** `tests::does_not_panic` (canary lib)
+Rerun: `cargo test --lib -- tests::does_not_panic --exact`
+**FAIL** `tests::fails` (canary lib)
+Rerun: `cargo test --lib -- tests::fails --exact`
+**FAIL** `tests::returns_err` (canary lib)
+Rerun: `cargo test --lib -- tests::returns_err --exact`
+**ABORT** `aborts` (canary test crash)
+Rerun: `cargo test --test crash -- aborts --exact`
+**FAIL** `src/lib.rs - add (line 8)` (canary doc)
+Rerun: `cargo test --doc -- 'src/lib.rs - add (line 8)'`
+| Status | Package | Target | Pass | Fail | Skip |
+| --- | --- | --- | ---: | ---: | ---: |
+| FAIL | canary | doc | 1 | 1 | 0 |
+| FAIL | canary | lib | 2 | 3 | 1 |
+| PASS | canary | test api | 1 | 0 | 0 |
+| ABORT | canary | test crash | 0 | 1 | 0 |
+4 passed, 5 failed, 1 skipped

@@ -1,0 +1,9 @@
+report -: compilation_time total_time type
+suite failed: event exec_time failed filtered_out ignored measured passed type
+suite ok: event exec_time failed filtered_out ignored measured passed type
+suite started: event test_count type
+test failed: event message name type
+test failed: event name stdout type
+test ignored: event message name type
+test ok: event name type
+test started: event name type

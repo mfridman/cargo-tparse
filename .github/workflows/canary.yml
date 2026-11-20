@@ -1,0 +1,56 @@
+# Weekly check for changes in the libtest JSON format. On a failure, it opens
+# an issue with the "canary" label, or comments on the open one.
+name: Canary
+
+on:
+  schedule:
+    - cron: "0 9 * * 1" # Mondays, 09:00 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  # The JSON events from the newest nightly, and how cargo tparse reads them.
+  nightly:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@nightly
+      - run: cargo test --test canary -- --ignored --exact nightly_format
+
+  # Fails when libtest JSON works on stable.
+  stable:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - run: cargo test --test canary -- --ignored --exact stable_has_no_json
+
+  issue:
+    needs: [nightly, stable]
+    if: failure()
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+      NIGHTLY: ${{ needs.nightly.result }}
+      STABLE: ${{ needs.stable.result }}
+    steps:
+      - run: |
+          body="The canary failed: $RUN_URL
+
+          - nightly: $NIGHTLY. A failure means the libtest JSON events or the report changed.
+          - stable: $STABLE. A failure can mean that libtest JSON works on stable now.
+
+          The job log shows the expected and actual output. If the change is expected, run the test with CANARY_UPDATE=1 and commit the files in tests/testdata/."
+          gh label create canary --color FBCA04 --description "libtest JSON canary" --force
+          number=$(gh issue list --label canary --state open --json number --jq '.[0].number')
+          if [ -n "$number" ]; then
+            gh issue comment "$number" --body "$body"
+          else
+            gh issue create --title "libtest JSON canary failed" --label canary --body "$body"
+          fi
