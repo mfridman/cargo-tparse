@@ -2,6 +2,7 @@
 name = "cargo-tparse"
 version = "0.1.0"
 edition = "2024"
+rust-version = "1.85"
 description = "Summarize cargo test JSON output in tables"
 license = "MIT"
 repository = "https://github.com/mfridman/cargo-tparse"

@@ -23,6 +23,14 @@ jobs:
       - run: cargo clippy --all-targets -- -D warnings
       - run: cargo test
 
+  # The oldest Rust in Cargo.toml's rust-version. Edition 2024 needs 1.85.
+  msrv:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@1.85
+      - run: cargo check --locked
+
   # Run this project's tests through cargo tparse, and write the report to
   # the step summary.
   tparse:
