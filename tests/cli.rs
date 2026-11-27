@@ -305,3 +305,62 @@ fn markdown_control_characters_cannot_join_backticks() {
         "{text}"
     );
 }
+
+#[test]
+fn package_rows() {
+    let text = stdout(&run(&fixture("workspace-deps.txt"), &["--by", "package"]));
+    assert!(
+        text.contains("│ Status │ Elapsed │ Package    │ Targets │ Pass │ Fail │ Skip │"),
+        "{text}"
+    );
+    assert!(
+        text.contains("│ FAIL   │   0.53s │ alpha-core │       4 │    4 │    1 │    0 │"),
+        "{text}"
+    );
+    assert!(text.contains("9 passed, 1 failed, 0 skipped in 1.20s"));
+}
+
+#[test]
+fn sort_by_elapsed_puts_the_slowest_first() {
+    let order = |args: &[&str]| {
+        let text = stdout(&run(&fixture("workspace-deps.txt"), args));
+        let packages = ["alpha-core", "beta", "gamma", "delta"];
+        let mut found: Vec<(usize, &str)> = packages
+            .iter()
+            .filter_map(|p| text.find(&format!("│ {p} ")).map(|i| (i, *p)))
+            .collect();
+        found.sort();
+        found.into_iter().map(|(_, p)| p).collect::<Vec<_>>()
+    };
+    let by_package = ["--by", "package"];
+    assert_eq!(order(&by_package), ["alpha-core", "beta", "delta", "gamma"]);
+    let slowest = ["--by", "package", "--sort", "elapsed"];
+    assert_eq!(order(&slowest), ["alpha-core", "beta", "gamma", "delta"]);
+    // With target rows, the slowest target is "beta test cli".
+    let text = stdout(&run(&fixture("workspace-deps.txt"), &["--sort", "elapsed"]));
+    let first_row = text
+        .lines()
+        .find(|l| l.starts_with("│ PASS") || l.starts_with("│ FAIL"));
+    assert_eq!(
+        first_row,
+        Some("│ PASS   │   0.50s │ beta       │ test cli  │    1 │    0 │    0 │")
+    );
+}
+
+#[test]
+fn package_rows_in_markdown() {
+    let text = stdout(&run(
+        &fixture("workspace.txt"),
+        &["--by", "package", "--format", "markdown"],
+    ));
+    assert!(text.contains("| Status | Elapsed | Package | Targets | Pass | Fail | Skip |"));
+    assert!(
+        text.contains("| --- | ---: | --- | ---: | ---: | ---: | ---: |"),
+        "{text}"
+    );
+    // The doc target of alpha-core ran no tests, so it does not count.
+    assert!(
+        text.contains("| FAIL | 0.00s | alpha-core | 1 | 2 | 1 | 0 |"),
+        "{text}"
+    );
+}

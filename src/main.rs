@@ -1,4 +1,5 @@
 mod ansi;
+mod package;
 mod parse;
 mod render;
 
@@ -10,7 +11,7 @@ use anstream::{AutoStream, ColorChoice};
 use clap::{Parser as _, ValueEnum};
 
 use crate::parse::{Parser, Report};
-use crate::render::Format;
+use crate::render::{Format, Options, Rows, Sort};
 
 const RUN: &str =
     "cargo +nightly test --no-fail-fast -- -Z unstable-options --format json 2>&1 | cargo tparse";
@@ -28,6 +29,14 @@ struct Args {
     #[arg(long, value_enum, default_value_t = FormatArg::Table)]
     format: FormatArg,
 
+    /// Show one row for each test target or for each package
+    #[arg(long, value_enum, default_value_t = ByArg::Target)]
+    by: ByArg,
+
+    /// Sort rows by name, or by elapsed time with the slowest first
+    #[arg(long, value_enum, default_value_t = SortArg::Name)]
+    sort: SortArg,
+
     /// Print one line for each target when it finishes
     #[arg(long)]
     progress: bool,
@@ -37,6 +46,18 @@ struct Args {
 enum FormatArg {
     Table,
     Markdown,
+}
+
+#[derive(Debug, Clone, Copy, ValueEnum)]
+enum ByArg {
+    Target,
+    Package,
+}
+
+#[derive(Debug, Clone, Copy, ValueEnum)]
+enum SortArg {
+    Name,
+    Elapsed,
 }
 
 fn main() -> ExitCode {
@@ -83,11 +104,21 @@ fn run(args: &Args) -> io::Result<bool> {
     if args.progress && report.targets.iter().any(|t| !t.is_empty()) {
         writeln!(stdout)?;
     }
-    let format = match args.format {
-        FormatArg::Table => Format::Table,
-        FormatArg::Markdown => Format::Markdown,
+    let options = Options {
+        format: match args.format {
+            FormatArg::Table => Format::Table,
+            FormatArg::Markdown => Format::Markdown,
+        },
+        rows: match args.by {
+            ByArg::Target => Rows::Target,
+            ByArg::Package => Rows::Package,
+        },
+        sort: match args.sort {
+            SortArg::Name => Sort::Name,
+            SortArg::Elapsed => Sort::Elapsed,
+        },
     };
-    stdout.write_all(render::report(&report, format).as_bytes())?;
+    stdout.write_all(render::report(&report, options).as_bytes())?;
     Ok(!report.failed())
 }
 

@@ -50,8 +50,15 @@ struct Suite {
 #[derive(Debug)]
 pub struct Target {
     /// Package name, from cargo's "Running" or "Doc-tests" line, or from the
-    /// "-p" argument in cargo's rerun hint.
+    /// "-p" argument in cargo's rerun hint. When cargo does not give it, it
+    /// is a guess from a crate name.
     pub package: Option<String>,
+    /// Cargo gave the package name. A guessed name is not used for "-p".
+    pub package_known: bool,
+    /// Crate name of the test binary, or of the lib for a doc target.
+    pub krate: Option<String>,
+    /// The target is the bin from src/main.rs.
+    pub main_bin: bool,
     /// Short name of the target, for example "lib" or "test api".
     pub label: String,
     /// Cargo arguments that select this target, for example "--test api".
@@ -77,7 +84,7 @@ pub struct Target {
     suite_start: usize,
     /// Names before a cargo hint changed them, for when the hint was test
     /// output.
-    before_hint: Option<(Option<String>, String, Option<String>)>,
+    before_hint: Option<(Option<String>, bool, String, Option<String>)>,
 }
 
 impl Target {
@@ -116,6 +123,11 @@ impl Target {
         self.label == "doc"
     }
 
+    /// The target came from a cargo "Running" or "Doc-tests" line.
+    pub fn has_header(&self) -> bool {
+        self.has_header
+    }
+
     /// The target has no header line, so it has no names.
     pub fn is_anonymous(&self) -> bool {
         self.label.starts_with('#')
@@ -127,9 +139,9 @@ impl Target {
             return Some(rerun.clone());
         }
         let selector = self.selector.as_ref()?;
-        Some(match &self.package {
-            Some(package) => format!("-p {package} {selector}"),
-            None => selector.clone(),
+        Some(match (&self.package, self.package_known) {
+            (Some(package), true) => format!("-p {package} {selector}"),
+            _ => selector.clone(),
         })
     }
 
@@ -137,6 +149,9 @@ impl Target {
         let has_header = !header.label.starts_with('#');
         Self {
             package: header.package,
+            package_known: header.package_known,
+            krate: header.krate,
+            main_bin: header.main_bin,
             label: header.label,
             selector: header.selector,
             rerun: None,
@@ -158,6 +173,7 @@ impl Target {
     fn name_from_hint(&mut self, args: &str) {
         self.before_hint = Some((
             self.package.clone(),
+            self.package_known,
             self.label.clone(),
             self.selector.clone(),
         ));
@@ -167,6 +183,7 @@ impl Target {
         let one_package = self.has_header || self.suites.len() <= 1;
         if let (Some(package), true) = (package, one_package) {
             self.package = Some(package.to_string());
+            self.package_known = true;
         }
         // Cargo knows the target. The binary name has '_' for '-', and a
         // custom path can make the source path look like another kind.
@@ -252,6 +269,7 @@ impl Parser {
         if let Some(header) = self.pending.take() {
             self.push_target(header, 0);
         }
+        crate::package::name_unknown(&mut self.report.targets);
         let failed = self.report.targets.iter().any(|t| t.cargo_failed);
         self.report.stopped_early = failed && !self.saw_failed_summary;
         self.report
@@ -283,8 +301,7 @@ impl Parser {
             return self.start_header(header);
         }
         if let (true, Some(name)) = (idle, trimmed.strip_prefix("Doc-tests ")) {
-            let package = self.packages.get(name).map_or(name, String::as_str);
-            let header = Header::doc(package);
+            let header = Header::doc(name, self.packages.get(name));
             self.pending_line = trimmed.to_string();
             return self.start_header(header);
         }
@@ -554,8 +571,9 @@ impl Parser {
         target.cargo_failed = false;
         target.rerun = None;
         target.exit_reason = None;
-        if let Some((package, label, selector)) = target.before_hint.take() {
+        if let Some((package, known, label, selector)) = target.before_hint.take() {
             target.package = package;
+            target.package_known = known;
             target.label = label;
             target.selector = selector;
         }
@@ -645,8 +663,10 @@ fn find_event(line: &str) -> Option<(usize, Event, &str)> {
 #[derive(Debug)]
 struct Header {
     package: Option<String>,
+    package_known: bool,
     /// Crate name of the test binary, for example "alpha_core".
     krate: Option<String>,
+    main_bin: bool,
     label: String,
     selector: Option<String>,
 }
@@ -662,18 +682,25 @@ impl Header {
         };
         let (package, krate) = binary.map(binary_names).unwrap_or_default();
         let (label, selector) = target_from_source(source, package.as_deref(), krate.as_deref());
+        let source = source.replace('\\', "/");
         Self {
+            package_known: package.is_some(),
             package,
             krate,
+            main_bin: source == "src/main.rs" || source.ends_with("/src/main.rs"),
             label,
             selector,
         }
     }
 
-    fn doc(package: &str) -> Self {
+    /// A "Doc-tests <crate>" line. The package is known when the lib's
+    /// binary path gave it. Otherwise the crate name is the guess.
+    fn doc(krate: &str, package: Option<&String>) -> Self {
         Self {
-            package: Some(package.to_string()),
-            krate: None,
+            package: Some(package.map_or(krate, String::as_str).to_string()),
+            package_known: package.is_some(),
+            krate: Some(krate.to_string()),
+            main_bin: false,
             label: "doc".to_string(),
             selector: Some("--doc".to_string()),
         }
@@ -682,7 +709,9 @@ impl Header {
     fn anonymous(number: usize) -> Self {
         Self {
             package: None,
+            package_known: false,
             krate: None,
+            main_bin: false,
             label: format!("#{number}"),
             selector: None,
         }
@@ -854,6 +883,73 @@ mod tests {
         assert_eq!(
             report.targets[1].rerun_args().as_deref(),
             Some("-p beta --bin beta")
+        );
+    }
+
+    #[test]
+    fn old_layout_package_names() {
+        // Binaries in target/debug/deps have no package name. The rerun
+        // hint names alpha-core, so its other targets get that name. The
+        // others get the crate name of their lib or src/main.rs bin.
+        let report = fixture("workspace-deps.txt");
+        assert_eq!(
+            labels(&report),
+            [
+                (Some("alpha-core"), "lib", Status::Pass),
+                (Some("alpha-core"), "test api", Status::Pass),
+                (Some("alpha-core"), "test cli", Status::Fail),
+                (Some("beta"), "bin beta", Status::Pass),
+                (Some("beta"), "test cli", Status::Pass),
+                (Some("gamma"), "lib", Status::Pass),
+                // A src/main.rs bin after a lib with another name starts a
+                // new package.
+                (Some("delta"), "bin delta", Status::Pass),
+                (Some("alpha-core"), "doc", Status::Pass),
+                (Some("gamma"), "doc", Status::Pass),
+            ]
+        );
+        // A guessed name can be wrong, for example a crate name with '_'
+        // for a package name with '-'. Only cargo's names go in "-p".
+        let reruns: Vec<_> = report.targets.iter().map(|t| t.rerun_args()).collect();
+        let reruns: Vec<_> = reruns.iter().map(|r| r.as_deref()).collect();
+        assert_eq!(
+            reruns,
+            [
+                Some("--lib"),
+                Some("--test api"),
+                Some("-p alpha-core --test cli"),
+                // The bin name can have '-' where the crate name has '_'.
+                None,
+                Some("--test cli"),
+                Some("--lib"),
+                None,
+                Some("--doc"),
+                Some("--doc"),
+            ]
+        );
+    }
+
+    #[test]
+    fn hint_with_another_package_keeps_the_guess() {
+        // A lib with `test = false` has no unit test binary, so its
+        // integration test joins the package before it. Its hint names its
+        // own package, which does not rename the lib of the other package.
+        let input = r#"Running unittests src/lib.rs (target/debug/deps/alpha-1)
+{ "type": "suite", "event": "started", "test_count": 0 }
+{ "type": "suite", "event": "ok", "passed": 0, "failed": 0 }
+Running tests/api.rs (target/debug/deps/api-2)
+{ "type": "suite", "event": "started", "test_count": 1 }
+{ "type": "test", "event": "failed", "name": "bad" }
+{ "type": "suite", "event": "failed", "passed": 0, "failed": 1 }
+error: test failed, to rerun pass `-p beta --test api`
+"#;
+        let report = parse(input);
+        assert_eq!(
+            labels(&report),
+            [
+                (Some("alpha"), "lib", Status::Pass),
+                (Some("beta"), "test api", Status::Fail),
+            ]
         );
     }
 
