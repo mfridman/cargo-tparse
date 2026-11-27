@@ -37,6 +37,9 @@ pub struct Options {
     pub format: Format,
     pub rows: Rows,
     pub sort: Sort,
+    /// Show this many of the slowest passed tests of each package. Zero
+    /// shows none.
+    pub slow: usize,
 }
 
 const BOLD: Style = Style::new().bold();
@@ -45,19 +48,46 @@ const DIM: Style = Style::new().dimmed();
 pub fn report(report: &Report, options: Options) -> String {
     let mut out = String::new();
     failures(&mut out, report, options.format);
+    let (slow, timed) = slow_table(report, options.sort, options.slow);
+    if !slow.rows.is_empty() {
+        if slow.rows.len() < timed {
+            let tests = if options.slow == 1 { "test" } else { "tests" };
+            let note = format!(
+                "Slowest {} passed {tests} of each package ({} of {timed} shown):",
+                options.slow,
+                slow.rows.len(),
+            );
+            match options.format {
+                Format::Table => {
+                    let _ = writeln!(out, "{DIM}{note}{DIM:#}");
+                }
+                Format::Markdown => {
+                    let _ = writeln!(out, "{note}\n");
+                }
+            }
+        }
+        render_table(&mut out, &slow, options.format);
+        out.push('\n');
+    }
     let table = match options.rows {
         Rows::Target => target_table(report, options.sort),
         Rows::Package => package_table(report, options.sort),
     };
     if !table.rows.is_empty() {
-        match options.format {
-            Format::Table => table.render_box(&mut out),
-            Format::Markdown => table.render_markdown(&mut out),
-        }
+        render_table(&mut out, &table, options.format);
     }
     totals(&mut out, report);
-    hints(&mut out, report, options.format);
+    // libtest gives the time of each test only with --report-time.
+    let no_times = options.slow > 0 && report.tests().all(|(_, t)| t.elapsed.is_none());
+    hints(&mut out, report, options.format, no_times);
     out
+}
+
+fn render_table(out: &mut String, table: &Table, format: Format) {
+    match format {
+        Format::Table => table.render_box(out),
+        Format::Markdown => table.render_markdown(out),
+    }
 }
 
 /// One line for a target that finished, for --progress.
@@ -309,13 +339,50 @@ fn target_table(report: &Report, sort: Sort) -> Table {
     table
 }
 
-fn package_table(report: &Report, sort: Sort) -> Table {
+fn sorted_packages(report: &Report, sort: Sort) -> Vec<package::Package<'_>> {
     let targets: Vec<&Target> = report.targets.iter().filter(|t| !t.is_empty()).collect();
     let mut packages = package::packages(&targets);
     packages.sort_by(|a, b| a.name.unwrap_or("-").cmp(b.name.unwrap_or("-")));
     if sort == Sort::Elapsed {
         packages.sort_by(|a, b| slowest_first(a.elapsed(), b.elapsed()));
     }
+    packages
+}
+
+/// The slowest passed tests of each package, the slowest first. Packages
+/// are in the same order as in the package table. It also returns the number
+/// of passed tests that have a time, shown or not.
+fn slow_table(report: &Report, sort: Sort, count: usize) -> (Table, usize) {
+    let mut table = Table::new(&["Elapsed", "Package", "Target", "Test"], &[0]);
+    let mut timed = 0;
+    if count == 0 {
+        return (table, timed);
+    }
+    for package in sorted_packages(report, sort) {
+        let mut tests: Vec<(&Target, &Test, f64)> = package
+            .targets
+            .iter()
+            .flat_map(|target| target.tests.iter().map(move |test| (*target, test)))
+            .filter(|(_, test)| test.status == Status::Pass)
+            .filter_map(|(target, test)| Some((target, test, test.elapsed?)))
+            .collect();
+        timed += tests.len();
+        // A stable sort: tests with the same time keep the order they ran in.
+        tests.sort_by(|a, b| b.2.total_cmp(&a.2));
+        for (target, test, elapsed) in tests.into_iter().take(count) {
+            table.rows.push(vec![
+                Cell::plain(seconds(Some(elapsed))),
+                Cell::plain(package.name.unwrap_or("-")),
+                Cell::plain(&target.label),
+                Cell::plain(&test.name),
+            ]);
+        }
+    }
+    (table, timed)
+}
+
+fn package_table(report: &Report, sort: Sort) -> Table {
+    let packages = sorted_packages(report, sort);
     let show_filtered = packages.iter().any(|p| p.filtered_out() > 0);
     let mut headers = vec![
         "Status", "Elapsed", "Package", "Targets", "Pass", "Fail", "Skip",
@@ -366,8 +433,11 @@ fn totals(out: &mut String, report: &Report) {
     );
 }
 
-fn hints(out: &mut String, report: &Report, format: Format) {
+fn hints(out: &mut String, report: &Report, format: Format, no_times: bool) {
     let mut hints = Vec::new();
+    if no_times {
+        hints.push("Test times need libtest's --report-time option. Add it after --format json.");
+    }
     if report.stopped_early {
         hints.push(
             "Cargo stopped after the first failed target. Add --no-fail-fast to run all targets.",

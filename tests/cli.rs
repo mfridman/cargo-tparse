@@ -364,3 +364,52 @@ fn package_rows_in_markdown() {
         "{text}"
     );
 }
+
+#[test]
+fn slow_shows_the_slowest_passed_tests_of_each_package() {
+    let text = stdout(&run(&fixture("workspace.txt"), &["--slow", "1"]));
+    // t::fails is the slowest test of alpha-core, but it failed. One test
+    // shows for each package.
+    let slow = "│ Elapsed │ Package    │ Target │ Test    │\n\
+        ├─────────┼────────────┼────────┼─────────┤\n\
+        │   0.00s │ alpha-core │ lib    │ t::fine │\n\
+        │   0.00s │ beta       │ bin    │ t::fine │\n\
+        └─────────┴────────────┴────────┴─────────┘\n\n┌";
+    assert!(text.contains(slow), "{text}");
+    // The table of slow tests comes before the summary table.
+    assert!(text.find("│ Test ") < text.find("│ Status "), "{text}");
+}
+
+#[test]
+fn slow_sorts_tests_by_time() {
+    let text = stdout(&run(&fixture("single.txt"), &["--slow", "2"]));
+    let slow = text.find("│ demo    │ test api │ slow ");
+    let doc = text.find("│ demo    │ doc      │ src/lib.rs - add (line 1) │");
+    assert!(slow.is_some() && doc.is_some() && slow < doc, "{text}");
+    assert!(!text.contains("│ tests::ok"), "{text}");
+}
+
+#[test]
+fn slow_without_test_times_has_a_hint() {
+    let text = stdout(&run(&fixture("workspace-deps.txt"), &["--slow", "3"]));
+    assert!(!text.contains("│ Test "), "{text}");
+    assert!(text.contains("Test times need libtest's --report-time option."));
+    // No hint without --slow.
+    let text = stdout(&run(&fixture("workspace-deps.txt"), &[]));
+    assert!(!text.contains("--report-time"), "{text}");
+}
+
+#[test]
+fn slow_says_how_many_tests_it_hides() {
+    let text = stdout(&run(&fixture("workspace.txt"), &["--slow", "1"]));
+    let note = "Slowest 1 passed test of each package (2 of 3 shown):\n┌";
+    assert!(text.contains(note), "{text}");
+    let args = ["--slow", "2", "--format", "markdown"];
+    let text = stdout(&run(&fixture("single.txt"), &args));
+    let note = "Slowest 2 passed tests of each package (2 of 4 shown):\n\n| Elapsed |";
+    assert!(text.contains(note), "{text}");
+    // No note when all tests show.
+    let text = stdout(&run(&fixture("workspace.txt"), &["--slow", "5"]));
+    assert!(text.contains("│ Test "), "{text}");
+    assert!(!text.contains("Slowest"), "{text}");
+}
