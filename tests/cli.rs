@@ -364,12 +364,3 @@ fn package_rows_in_markdown() {
         "{text}"
     );
 }
-
-#[test]
-fn help_has_examples() {
-    let text = stdout(&run("", &["--help"]));
-    assert!(text.contains("\nExamples:\n"), "{text}");
-    assert!(text.contains("| cargo tparse --by package --sort elapsed"));
-    // The redirect of stderr comes after the redirect of stdout.
-    assert!(text.contains("--format json > test.out 2>&1\n"));
-}

@@ -13,40 +13,8 @@ use clap::{Parser as _, ValueEnum};
 use crate::parse::{Parser, Report};
 use crate::render::{Format, Options, Rows, Sort};
 
-/// The cargo test command whose output cargo tparse reads, with no
-/// redirect.
-macro_rules! cargo_test {
-    () => {
-        "cargo +nightly test --no-fail-fast -- -Z unstable-options --format json"
-    };
-}
-
-const RUN: &str = concat!(cargo_test!(), " 2>&1 | cargo tparse");
-
-const EXAMPLES: &str = concat!(
-    "Examples:\n",
-    "  # Failed tests, then one row for each test target\n",
-    "  ",
-    cargo_test!(),
-    " 2>&1 \\\n    | cargo tparse\n",
-    "\n",
-    "  # One row for each package, the slowest first\n",
-    "  ",
-    cargo_test!(),
-    " 2>&1 \\\n    | cargo tparse --by package --sort elapsed\n",
-    "\n",
-    "  # Markdown for a GitHub Actions job summary\n",
-    "  set -o pipefail\n",
-    "  ",
-    cargo_test!(),
-    " 2>&1 \\\n    | cargo tparse --format markdown >> \"$GITHUB_STEP_SUMMARY\"\n",
-    "\n",
-    "  # Save the output once, then read it again with other options\n",
-    "  ",
-    cargo_test!(),
-    " > test.out 2>&1\n",
-    "  cargo tparse --by package < test.out",
-);
+const RUN: &str =
+    "cargo +nightly test --no-fail-fast -- -Z unstable-options --format json 2>&1 | cargo tparse";
 
 #[derive(Debug, clap::Parser)]
 #[command(
@@ -54,7 +22,7 @@ const EXAMPLES: &str = concat!(
     bin_name = "cargo tparse",
     version,
     about = "Summarize cargo test output in tables",
-    after_help = EXAMPLES
+    after_help = format!("Example:\n  {RUN}")
 )]
 struct Args {
     /// Output format
