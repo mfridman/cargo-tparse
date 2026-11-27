@@ -1,0 +1,51 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.00s
+     Running unittests src/lib.rs (target/debug/deps/alpha_core-0a1b2c3d4e5f6071)
+{ "type": "suite", "event": "started", "test_count": 1 }
+{ "type": "test", "event": "started", "name": "t::fine" }
+{ "type": "test", "name": "t::fine", "event": "ok" }
+{ "type": "suite", "event": "ok", "passed": 1, "failed": 0, "ignored": 0, "measured": 0, "filtered_out": 0, "exec_time": 0.01 }
+     Running tests/api.rs (target/debug/deps/api-1a1b2c3d4e5f6071)
+{ "type": "suite", "event": "started", "test_count": 1 }
+{ "type": "test", "event": "started", "name": "works" }
+{ "type": "test", "name": "works", "event": "ok" }
+{ "type": "suite", "event": "ok", "passed": 1, "failed": 0, "ignored": 0, "measured": 0, "filtered_out": 0, "exec_time": 0.30 }
+     Running tests/cli.rs (target/debug/deps/cli-2a1b2c3d4e5f6071)
+{ "type": "suite", "event": "started", "test_count": 2 }
+{ "type": "test", "event": "started", "name": "fails" }
+{ "type": "test", "event": "started", "name": "fine" }
+{ "type": "test", "name": "fails", "event": "failed", "stdout": "boom\n" }
+{ "type": "test", "name": "fine", "event": "ok" }
+{ "type": "suite", "event": "failed", "passed": 1, "failed": 1, "ignored": 0, "measured": 0, "filtered_out": 0, "exec_time": 0.02 }
+error: test failed, to rerun pass `-p alpha-core --test cli`
+     Running unittests src/main.rs (target/debug/deps/beta-3a1b2c3d4e5f6071)
+{ "type": "suite", "event": "started", "test_count": 1 }
+{ "type": "test", "event": "started", "name": "t::fine" }
+{ "type": "test", "name": "t::fine", "event": "ok" }
+{ "type": "suite", "event": "ok", "passed": 1, "failed": 0, "ignored": 0, "measured": 0, "filtered_out": 0, "exec_time": 0.00 }
+     Running tests/cli.rs (target/debug/deps/cli-4a1b2c3d4e5f6071)
+{ "type": "suite", "event": "started", "test_count": 1 }
+{ "type": "test", "event": "started", "name": "works" }
+{ "type": "test", "name": "works", "event": "ok" }
+{ "type": "suite", "event": "ok", "passed": 1, "failed": 0, "ignored": 0, "measured": 0, "filtered_out": 0, "exec_time": 0.50 }
+     Running unittests src/lib.rs (target/debug/deps/gamma-5a1b2c3d4e5f6071)
+{ "type": "suite", "event": "started", "test_count": 1 }
+{ "type": "test", "event": "started", "name": "t::fine" }
+{ "type": "test", "name": "t::fine", "event": "ok" }
+{ "type": "suite", "event": "ok", "passed": 1, "failed": 0, "ignored": 0, "measured": 0, "filtered_out": 0, "exec_time": 0.04 }
+     Running unittests src/main.rs (target/debug/deps/delta-6a1b2c3d4e5f6071)
+{ "type": "suite", "event": "started", "test_count": 1 }
+{ "type": "test", "event": "started", "name": "t::fine" }
+{ "type": "test", "name": "t::fine", "event": "ok" }
+{ "type": "suite", "event": "ok", "passed": 1, "failed": 0, "ignored": 0, "measured": 0, "filtered_out": 0, "exec_time": 0.03 }
+   Doc-tests alpha_core
+{ "type": "suite", "event": "started", "test_count": 1 }
+{ "type": "test", "event": "started", "name": "src/lib.rs - add (line 1)" }
+{ "type": "test", "name": "src/lib.rs - add (line 1)", "event": "ok" }
+{ "type": "suite", "event": "ok", "passed": 1, "failed": 0, "ignored": 0, "measured": 0, "filtered_out": 0, "exec_time": 0.20 }
+   Doc-tests gamma
+{ "type": "suite", "event": "started", "test_count": 1 }
+{ "type": "test", "event": "started", "name": "src/lib.rs - sub (line 1)" }
+{ "type": "test", "name": "src/lib.rs - sub (line 1)", "event": "ok" }
+{ "type": "suite", "event": "ok", "passed": 1, "failed": 0, "ignored": 0, "measured": 0, "filtered_out": 0, "exec_time": 0.10 }
+error: 1 target failed:
+    `-p alpha-core --test cli`

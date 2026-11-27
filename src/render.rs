@@ -1,12 +1,14 @@
 //! Render a report as text. The text can contain ANSI styles. The caller
 //! writes it through a stream that removes the styles when color is off.
 
+use std::cmp::Ordering;
 use std::fmt::Write;
 
 use anstyle::{AnsiColor, Style};
 use unicode_width::UnicodeWidthStr;
 
 use crate::ansi;
+use crate::package;
 use crate::parse::{Report, Status, Target, Test};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -15,14 +17,46 @@ pub enum Format {
     Markdown,
 }
 
+/// What one row of the summary table shows.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Rows {
+    Target,
+    Package,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Sort {
+    /// By package name, then by target name.
+    Name,
+    /// The slowest first.
+    Elapsed,
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct Options {
+    pub format: Format,
+    pub rows: Rows,
+    pub sort: Sort,
+}
+
 const BOLD: Style = Style::new().bold();
 const DIM: Style = Style::new().dimmed();
 
-pub fn report(report: &Report, format: Format) -> String {
+pub fn report(report: &Report, options: Options) -> String {
     let mut out = String::new();
-    failures(&mut out, report, format);
-    summary(&mut out, report, format);
-    hints(&mut out, report, format);
+    failures(&mut out, report, options.format);
+    let table = match options.rows {
+        Rows::Target => target_table(report, options.sort),
+        Rows::Package => package_table(report, options.sort),
+    };
+    if !table.rows.is_empty() {
+        match options.format {
+            Format::Table => table.render_box(&mut out),
+            Format::Markdown => table.render_markdown(&mut out),
+        }
+    }
+    totals(&mut out, report);
+    hints(&mut out, report, options.format);
     out
 }
 
@@ -235,9 +269,19 @@ fn fenced(text: &str) -> String {
     format!("{fence}text\n{text}\n{fence}")
 }
 
-fn summary(out: &mut String, report: &Report, format: Format) {
+/// Slowest first. A row with no time comes last.
+fn slowest_first(a: Option<f64>, b: Option<f64>) -> Ordering {
+    let time = |t: Option<f64>| t.unwrap_or(f64::NEG_INFINITY);
+    time(b).total_cmp(&time(a))
+}
+
+fn target_table(report: &Report, sort: Sort) -> Table {
     let mut targets: Vec<&Target> = report.targets.iter().filter(|t| !t.is_empty()).collect();
     targets.sort_by(|a, b| (package(a), &a.label).cmp(&(package(b), &b.label)));
+    if sort == Sort::Elapsed {
+        // A stable sort: rows with the same time stay sorted by name.
+        targets.sort_by(|a, b| slowest_first(a.elapsed(), b.elapsed()));
+    }
     let show_filtered = targets.iter().any(|t| t.filtered_out() > 0);
     let mut headers = vec![
         "Status", "Elapsed", "Package", "Target", "Pass", "Fail", "Skip",
@@ -245,12 +289,7 @@ fn summary(out: &mut String, report: &Report, format: Format) {
     if show_filtered {
         headers.push("Filtered");
     }
-    let mut table = Table::new(&headers);
-    for column in [1, 4, 5, 6, 7] {
-        if column < table.right.len() {
-            table.right[column] = true;
-        }
-    }
+    let mut table = Table::new(&headers, &[1, 4, 5, 6, 7]);
     for target in &targets {
         let failed = target.count(Status::Fail) + target.count(Status::Abort);
         let mut row = vec![
@@ -267,13 +306,45 @@ fn summary(out: &mut String, report: &Report, format: Format) {
         }
         table.rows.push(row);
     }
-    if !table.rows.is_empty() {
-        match format {
-            Format::Table => table.render_box(out),
-            Format::Markdown => table.render_markdown(out),
-        }
-    }
+    table
+}
 
+fn package_table(report: &Report, sort: Sort) -> Table {
+    let targets: Vec<&Target> = report.targets.iter().filter(|t| !t.is_empty()).collect();
+    let mut packages = package::packages(&targets);
+    packages.sort_by(|a, b| a.name.unwrap_or("-").cmp(b.name.unwrap_or("-")));
+    if sort == Sort::Elapsed {
+        packages.sort_by(|a, b| slowest_first(a.elapsed(), b.elapsed()));
+    }
+    let show_filtered = packages.iter().any(|p| p.filtered_out() > 0);
+    let mut headers = vec![
+        "Status", "Elapsed", "Package", "Targets", "Pass", "Fail", "Skip",
+    ];
+    if show_filtered {
+        headers.push("Filtered");
+    }
+    let mut table = Table::new(&headers, &[1, 3, 4, 5, 6, 7]);
+    for package in &packages {
+        let failed = package.count(Status::Fail) + package.count(Status::Abort);
+        let mut row = vec![
+            status_cell(package.status()),
+            Cell::plain(seconds(package.elapsed())),
+            Cell::plain(package.name.unwrap_or("-")),
+            Cell::plain(package.targets.len().to_string()),
+            Cell::plain(package.count(Status::Pass).to_string()),
+            Cell::plain(failed.to_string()),
+            Cell::plain(package.count(Status::Skip).to_string()),
+        ];
+        if show_filtered {
+            row.push(Cell::plain(package.filtered_out().to_string()));
+        }
+        table.rows.push(row);
+    }
+    table
+}
+
+/// The line with the totals, for example "3 passed, 1 failed, 0 skipped".
+fn totals(out: &mut String, report: &Report) {
     let count = |status| report.tests().filter(|(_, t)| t.status == status).count();
     let failed = count(Status::Fail) + count(Status::Abort);
     // fold, not sum: an empty f64 sum is -0.0, which prints as "-0.00s".
@@ -419,10 +490,12 @@ struct Table {
 }
 
 impl Table {
-    fn new(headers: &[&str]) -> Self {
+    /// A table with the given columns aligned to the right.
+    fn new(headers: &[&str], right: &[usize]) -> Self {
+        let right = (0..headers.len()).map(|i| right.contains(&i)).collect();
         Self {
             headers: headers.iter().map(|h| h.to_string()).collect(),
-            right: vec![false; headers.len()],
+            right,
             rows: Vec::new(),
         }
     }

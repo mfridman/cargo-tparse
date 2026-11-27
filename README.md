@@ -49,7 +49,16 @@ Options:
 
 ```
 --format <table|markdown>   Output format (default: table)
+--by <target|package>       One row for each test target or each package (default: target)
+--sort <name|elapsed>       Sort rows by name, or by elapsed time with the slowest first (default: name)
 --progress                  Print a line for each test target as it finishes
+```
+
+Find the slowest packages in a workspace:
+
+```
+cargo +nightly test --workspace --no-fail-fast -- -Z unstable-options --format json 2>&1 \
+  | cargo tparse --by package --sort elapsed
 ```
 
 Exits with 1 if any test fails. Write a GitHub Actions summary:
@@ -63,4 +72,5 @@ cargo +nightly test --no-fail-fast -- -Z unstable-options --format json 2>&1 \
 ## Limits
 
 - With `--nocapture`, libtest does not capture test output, so it shows under "More from <target>" instead of under each test.
+- Older cargo (for example 1.95) puts test binaries in `target/debug/deps`, and their paths have no package name. Then `cargo tparse` uses the crate name of the package's lib or `src/main.rs` bin, which has `_` where the package name has `-`. A package with neither (only `src/bin/*.rs`, or `[lib] test = false`) can show under the package before it. When cargo's rerun hint for a failed target names the package, all targets of that package use the name.
 - `cargo test -q` hides cargo's `Running` lines, so passing targets show as `#1`, `#2`, and doc tests from more than one package can share a row.
