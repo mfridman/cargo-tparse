@@ -52,8 +52,10 @@ Options:
 --by <target|package>       One row for each test target or each package (default: target)
 --sort <name|elapsed>       Sort rows by name, or by elapsed time with the slowest first (default: name)
 --slow <N>                  Show the N slowest passed tests of each package (needs --report-time)
---progress                  Print a line for each test target as it finishes
+--progress                  Print cargo's build status, and a line for each test target as it finishes
 ```
+
+Without `--progress`, `cargo tparse` prints nothing until cargo exits, which can take a long time while cargo builds. With `--progress`, you see cargo's `Compiling` and `Finished` lines as they come, then one line for each test target.
 
 Find the slowest packages in a workspace:
 

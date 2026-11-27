@@ -42,7 +42,8 @@ struct Args {
     #[arg(long, value_name = "N", default_value_t = 0)]
     slow: usize,
 
-    /// Print one line for each target when it finishes
+    /// Print cargo's build status, and one line for each target when it
+    /// finishes
     #[arg(long)]
     progress: bool,
 }
@@ -133,20 +134,31 @@ fn read(mut input: impl BufRead, progress: bool, stdout: &mut impl Write) -> io:
     let mut buf = Vec::new();
     loop {
         buf.clear();
+        let mut status = None;
         let finished = if input.read_until(b'\n', &mut buf)? == 0 {
             None
         } else {
             let line = String::from_utf8_lossy(&buf);
-            Some(parser.line(line.trim_end_matches(['\n', '\r'])))
+            let line = line.trim_end_matches(['\n', '\r']);
+            // Show that cargo is still building, before any test runs.
+            if progress {
+                status = parser.cargo_status(line);
+            }
+            Some(parser.line(line))
         };
         let done = finished.is_none();
         let index = finished.unwrap_or_else(|| parser.flush());
         if let (true, Some(index)) = (progress, index) {
+            parser.name_packages();
             let target = &parser.report().targets[index];
             if !target.is_empty() {
                 writeln!(stdout, "{}", render::progress_line(target))?;
                 stdout.flush()?;
             }
+        }
+        if let Some(status) = status {
+            writeln!(stdout, "{}", render::status_line(&status))?;
+            stdout.flush()?;
         }
         if done {
             return Ok(parser.finish());

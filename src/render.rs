@@ -108,6 +108,11 @@ pub fn progress_line(target: &Target) -> String {
     )
 }
 
+/// A cargo status line, for --progress.
+pub fn status_line(line: &str) -> String {
+    format!("{DIM}{line}{DIM:#}")
+}
+
 fn failures(out: &mut String, report: &Report, format: Format) {
     for target in &report.targets {
         if target.status() == Status::Pass {
@@ -436,11 +441,11 @@ fn totals(out: &mut String, report: &Report) {
 fn hints(out: &mut String, report: &Report, format: Format, no_times: bool) {
     let mut hints = Vec::new();
     if no_times {
-        hints.push("Test times need libtest's --report-time option. Add it after --format json.");
+        hints.push("test times need libtest's --report-time option. Add it after --format json.");
     }
     if report.stopped_early {
         hints.push(
-            "Cargo stopped after the first failed target. Add --no-fail-fast to run all targets.",
+            "cargo stopped after the first failed target. Add --no-fail-fast to run all targets.",
         );
     }
     let nightly = "only accepted on the nightly compiler";
@@ -452,15 +457,15 @@ fn hints(out: &mut String, report: &Report, format: Format, no_times: bool) {
         hints.push("JSON test output needs a nightly toolchain. Use cargo +nightly test.");
     }
     if report.targets.iter().any(|t| t.is_anonymous()) {
-        hints.push("Package and target names come from cargo's stderr. Pipe it with 2>&1, and do not use -q.");
+        hints.push("package and target names come from cargo's stderr. Pipe it with 2>&1, and do not use -q.");
     }
     for hint in hints {
         match format {
             Format::Markdown => {
-                let _ = writeln!(out, "\n> {hint}");
+                let _ = writeln!(out, "\n> Hint: {hint}");
             }
             Format::Table => {
-                let _ = writeln!(out, "{DIM}{hint}{DIM:#}");
+                let _ = writeln!(out, "{DIM}Hint: {hint}{DIM:#}");
             }
         }
     }

@@ -257,6 +257,38 @@ impl Parser {
         &self.report
     }
 
+    /// Guess the package names that cargo did not give, from the targets
+    /// so far. Call it before a progress line. finish does it again with all
+    /// targets.
+    pub fn name_packages(&mut self) {
+        crate::package::name_unknown(&mut self.report.targets);
+    }
+
+    /// Return a cargo status line, for example "Compiling demo v0.1.0", with
+    /// no colors. While a test binary runs, such lines are test output.
+    /// "Running" and "Doc-tests" are not status lines here: the progress
+    /// line of each target shows them.
+    pub fn cargo_status(&self, line: &str) -> Option<String> {
+        const VERBS: [&str; 10] = [
+            "Adding",
+            "Blocking",
+            "Checking",
+            "Compiling",
+            "Downloaded",
+            "Downloading",
+            "Finished",
+            "Fresh",
+            "Locking",
+            "Updating",
+        ];
+        if self.open.is_some() {
+            return None;
+        }
+        let clean = ansi::strip(line);
+        let (verb, rest) = clean.trim().split_once(' ')?;
+        (VERBS.contains(&verb) && !rest.trim().is_empty()).then(|| clean.trim_end().to_string())
+    }
+
     /// Call at the end of the input. It returns a target that finished
     /// but was not returned yet.
     pub fn flush(&mut self) -> Option<usize> {

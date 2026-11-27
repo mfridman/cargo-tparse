@@ -68,11 +68,39 @@ fn markdown_summary() {
 fn progress_prints_a_line_for_each_target() {
     let output = run(&fixture("workspace.txt"), &["--progress"]);
     let text = stdout(&output);
-    assert!(
-        text.starts_with("FAIL   alpha-core lib  1 failed"),
-        "{text}"
-    );
+    let start = "    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.00s\n\
+        FAIL   alpha-core lib  1 failed";
+    assert!(text.starts_with(start), "{text}");
     assert!(text.contains("PASS   beta bin"));
+}
+
+#[test]
+fn progress_prints_cargo_status_lines() {
+    let input = concat!(
+        "    Updating crates.io index\n",
+        "   Compiling demo v0.1.0 (/src/demo)\n",
+        "warning: unused variable: `x`\n",
+        "    Finished `test` profile [unoptimized + debuginfo] target(s) in 1.00s\n",
+        "     Running tests/api.rs (target/debug/deps/api-0123abcd)\n",
+        r#"{ "type": "suite", "event": "started", "test_count": 1 }"#,
+        "\n",
+        // Test output while the binary runs is not a status line.
+        "   Compiling fake v0.0.0\n",
+        r#"{ "type": "test", "name": "works", "event": "ok" }"#,
+        "\n",
+        r#"{ "type": "suite", "event": "ok", "passed": 1, "failed": 0, "exec_time": 0.002 }"#,
+        "\n",
+    );
+    let text = stdout(&run(input, &["--progress"]));
+    let progress = "    Updating crates.io index\n\
+        \x20  Compiling demo v0.1.0 (/src/demo)\n\
+        \x20   Finished `test` profile [unoptimized + debuginfo] target(s) in 1.00s\n\
+        PASS   test api  0.00s\n\n";
+    assert!(text.starts_with(progress), "{text}");
+    assert!(!text.contains("fake"), "{text}");
+    // Without --progress, no status lines.
+    let text = stdout(&run(input, &[]));
+    assert!(!text.contains("Compiling"), "{text}");
 }
 
 #[test]
@@ -393,7 +421,7 @@ fn slow_sorts_tests_by_time() {
 fn slow_without_test_times_has_a_hint() {
     let text = stdout(&run(&fixture("workspace-deps.txt"), &["--slow", "3"]));
     assert!(!text.contains("│ Test "), "{text}");
-    assert!(text.contains("Test times need libtest's --report-time option."));
+    assert!(text.contains("\nHint: test times need libtest's --report-time option."));
     // No hint without --slow.
     let text = stdout(&run(&fixture("workspace-deps.txt"), &[]));
     assert!(!text.contains("--report-time"), "{text}");
@@ -412,4 +440,12 @@ fn slow_says_how_many_tests_it_hides() {
     let text = stdout(&run(&fixture("workspace.txt"), &["--slow", "5"]));
     assert!(text.contains("│ Test "), "{text}");
     assert!(!text.contains("Slowest"), "{text}");
+}
+
+#[test]
+fn progress_lines_have_guessed_package_names() {
+    // The old layout has no package names in binary paths.
+    let text = stdout(&run(&fixture("workspace-deps.txt"), &["--progress"]));
+    assert!(text.contains("\nPASS   alpha_core lib  0.01s\n"), "{text}");
+    assert!(text.contains("\nPASS   delta bin delta  0.03s\n"), "{text}");
 }
