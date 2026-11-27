@@ -6,18 +6,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## [Unreleased]
 
+## [v0.2.0] - 2026-11-27
+
 - Add `--by package` to show one row for each package, with the number of test targets in each (#2)
 - Add `--sort elapsed` to show the slowest rows first (#2)
 - Show package names when cargo puts test binaries in `target/debug/deps` (older cargo, for example 1.95). Before, the Package column showed `-`. The name is a guess from the crate name of the package's lib or `src/main.rs` bin, or comes from cargo's rerun hint (#2)
 - Do not use a guessed package name in `-p` of a rerun command, because a crate name such as `foo_bar` does not match the package `foo-bar` (#2)
 - Add `--slow N` to show the N slowest passed tests of each package. Test times need libtest's `--report-time` option (#3)
 - Start each hint after the totals line with "Hint:", so it does not look like part of the results
-- Show the build time from cargo's `Finished` line on the totals line, and the total time of a live run, for example `in 12.27s (build 28.40s, total 53.00s)`. The test time counts only libtest's time in each test binary
+- Show the build time from cargo's `Finished` line on the totals line, and the total time of a live run, for example `in 12.27s (build 28.40s, total 53.00s)`. The test time counts only libtest's time in each test binary (#4)
 - `--progress` now also prints cargo's build status lines (`Compiling`, `Finished`, and others), so a long build no longer looks stuck. Progress lines also show guessed package names
 
 ## [v0.1.0] - 2026-11-20
 
 - Initial release
 
-[Unreleased]: https://github.com/mfridman/cargo-tparse/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/mfridman/cargo-tparse/compare/v0.2.0...HEAD
+[v0.2.0]: https://github.com/mfridman/cargo-tparse/compare/v0.1.0...v0.2.0
 [v0.1.0]: https://github.com/mfridman/cargo-tparse/releases/tag/v0.1.0
