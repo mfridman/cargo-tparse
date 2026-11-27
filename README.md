@@ -43,7 +43,7 @@ cargo +nightly test --no-fail-fast -- -Z unstable-options --format json 2>&1 | c
 - `2>&1` lets `cargo tparse` read package and target names from cargo's `Running` lines.
 - `--no-fail-fast` runs every test target instead of stopping at the first failure.
 
-Read saved output: `cargo tparse < test.out`
+Read saved output: `cargo tparse < test.out`. Exits with 1 if any test fails.
 
 Options:
 
@@ -55,41 +55,8 @@ Options:
 --progress                  Print cargo's build status, and a line for each test target as it finishes
 ```
 
-Without `--progress`, `cargo tparse` prints nothing until cargo exits, which can take a long time while cargo builds. With `--progress`, you see cargo's `Compiling` and `Finished` lines as they come, then one line for each test target.
+## More
 
-Find the slowest packages in a workspace:
-
-```
-cargo +nightly test --workspace --no-fail-fast -- -Z unstable-options --format json 2>&1 \
-  | cargo tparse --by package --sort elapsed
-```
-
-Show the 5 slowest tests of each package. libtest gives the time of each test only with `--report-time`:
-
-```
-cargo +nightly test --workspace --no-fail-fast -- -Z unstable-options --format json --report-time 2>&1 \
-  | cargo tparse --slow 5
-```
-
-Exits with 1 if any test fails. Write a GitHub Actions summary:
-
-```
-set -o pipefail
-cargo +nightly test --no-fail-fast -- -Z unstable-options --format json 2>&1 \
-  | cargo tparse --format markdown >> "$GITHUB_STEP_SUMMARY"
-```
-
-## Times
-
-Cargo builds the code, then runs each test binary one at a time. In a binary, libtest runs the tests in parallel.
-
-- `Elapsed` in the tables, and the time after `in` on the totals line, is the time that libtest measured in each test binary. It does not count the build, the start of each binary, or the time that rustdoc needs before it runs doc tests.
-- `build` is the time from cargo's `Finished` line.
-- `total` is the time from the start of `cargo tparse` to the end of cargo's output, so it counts everything. It shows only when `cargo tparse` reads cargo's output live from a pipe, not for saved output.
-- With `--slow`, the time of each test can overlap with other tests, because tests run in parallel.
-
-## Limits
-
-- With `--nocapture`, libtest does not capture test output, so it shows under "More from <target>" instead of under each test.
-- Older cargo (for example 1.95) puts test binaries in `target/debug/deps`, and their paths have no package name. Then `cargo tparse` uses the crate name of the package's lib or `src/main.rs` bin, which has `_` where the package name has `-`. A package with neither (only `src/bin/*.rs`, or `[lib] test = false`) can show under the package before it. When cargo's rerun hint for a failed target names the package, all targets of that package use the name.
-- `cargo test -q` hides cargo's `Running` lines, so passing targets show as `#1`, `#2`, and doc tests from more than one package can share a row.
+- [Examples](docs/examples.md): find slow packages and tests, see progress, write a GitHub Actions summary, read saved output.
+- [Times](docs/times.md): what `Elapsed`, `build`, and `total` count.
+- [Limits](docs/limits.md): `--nocapture`, `cargo test -q`, and package names on older cargo.
