@@ -37,6 +37,11 @@ struct Args {
     #[arg(long, value_enum, default_value_t = SortArg::Name)]
     sort: SortArg,
 
+    /// Show the N slowest passed tests of each package. Test times need
+    /// libtest's --report-time option
+    #[arg(long, value_name = "N", default_value_t = 0)]
+    slow: usize,
+
     /// Print one line for each target when it finishes
     #[arg(long)]
     progress: bool,
@@ -117,6 +122,7 @@ fn run(args: &Args) -> io::Result<bool> {
             SortArg::Name => Sort::Name,
             SortArg::Elapsed => Sort::Elapsed,
         },
+        slow: args.slow,
     };
     stdout.write_all(render::report(&report, options).as_bytes())?;
     Ok(!report.failed())

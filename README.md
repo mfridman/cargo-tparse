@@ -51,6 +51,7 @@ Options:
 --format <table|markdown>   Output format (default: table)
 --by <target|package>       One row for each test target or each package (default: target)
 --sort <name|elapsed>       Sort rows by name, or by elapsed time with the slowest first (default: name)
+--slow <N>                  Show the N slowest passed tests of each package (needs --report-time)
 --progress                  Print a line for each test target as it finishes
 ```
 
@@ -59,6 +60,13 @@ Find the slowest packages in a workspace:
 ```
 cargo +nightly test --workspace --no-fail-fast -- -Z unstable-options --format json 2>&1 \
   | cargo tparse --by package --sort elapsed
+```
+
+Show the 5 slowest tests of each package. libtest gives the time of each test only with `--report-time`:
+
+```
+cargo +nightly test --workspace --no-fail-fast -- -Z unstable-options --format json --report-time 2>&1 \
+  | cargo tparse --slow 5
 ```
 
 Exits with 1 if any test fails. Write a GitHub Actions summary:
