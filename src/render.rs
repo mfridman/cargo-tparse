@@ -40,6 +40,9 @@ pub struct Options {
     /// Show this many of the slowest passed tests of each package. Zero
     /// shows none.
     pub slow: usize,
+    /// Seconds from the start of cargo tparse to the end of its input. Only
+    /// for live cargo output, not for saved output.
+    pub total: Option<f64>,
 }
 
 const BOLD: Style = Style::new().bold();
@@ -76,7 +79,7 @@ pub fn report(report: &Report, options: Options) -> String {
     if !table.rows.is_empty() {
         render_table(&mut out, &table, options.format);
     }
-    totals(&mut out, report);
+    totals(&mut out, report, options.total);
     // libtest gives the time of each test only with --report-time.
     let no_times = options.slow > 0 && report.tests().all(|(_, t)| t.elapsed.is_none());
     hints(&mut out, report, options.format, no_times);
@@ -416,7 +419,7 @@ fn package_table(report: &Report, sort: Sort) -> Table {
 }
 
 /// The line with the totals, for example "3 passed, 1 failed, 0 skipped".
-fn totals(out: &mut String, report: &Report) {
+fn totals(out: &mut String, report: &Report, total: Option<f64>) {
     let count = |status| report.tests().filter(|(_, t)| t.status == status).count();
     let failed = count(Status::Fail) + count(Status::Abort);
     // fold, not sum: an empty f64 sum is -0.0, which prints as "-0.00s".
@@ -430,12 +433,36 @@ fn totals(out: &mut String, report: &Report) {
         0 => String::new(),
         n => format!(", {n} filtered out"),
     };
+    // The test time is only libtest's time in each test binary. Build time
+    // and total time show the rest.
+    let mut times = Vec::new();
+    if let Some(build) = report.build_time {
+        times.push(format!("build {}", duration(build)));
+    }
+    // A live run takes at least as long as its tests. Less means saved
+    // output, for example "cat test.out | cargo tparse".
+    if let Some(total) = total.filter(|total| *total >= elapsed) {
+        times.push(format!("total {}", duration(total)));
+    }
+    let times = match times.is_empty() {
+        true => String::new(),
+        false => format!(" ({})", times.join(", ")),
+    };
     let _ = writeln!(
         out,
-        "\n{} passed, {failed} failed, {} skipped{filtered} in {elapsed:.2}s",
+        "\n{} passed, {failed} failed, {} skipped{filtered} in {elapsed:.2}s{times}",
         count(Status::Pass),
         count(Status::Skip),
     );
+}
+
+/// Seconds as cargo shows them: "29.84s", or "1m 14s" from one minute.
+fn duration(seconds: f64) -> String {
+    if seconds < 60.0 {
+        return format!("{seconds:.2}s");
+    }
+    let seconds = seconds.round() as u64;
+    format!("{}m {:02}s", seconds / 60, seconds % 60)
 }
 
 fn hints(out: &mut String, report: &Report, format: Format, no_times: bool) {

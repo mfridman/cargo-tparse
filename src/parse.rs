@@ -202,6 +202,8 @@ pub struct Report {
     pub other_lines: Vec<String>,
     /// Cargo stopped after the first failed target (no --no-fail-fast).
     pub stopped_early: bool,
+    /// Seconds that cargo took to build, from its "Finished" line.
+    pub build_time: Option<f64>,
 }
 
 impl Report {
@@ -352,6 +354,9 @@ impl Parser {
             self.saw_failed_summary = true;
             self.current = None;
             return self.done_later.take();
+        }
+        if let (true, Some(seconds)) = (idle, build_time(trimmed)) {
+            *self.report.build_time.get_or_insert(0.0) += seconds;
         }
         if let (true, Some(reason)) = (idle, exit_reason(trimmed)) {
             if let Some(target) = self.current.map(|i| &mut self.report.targets[i]) {
@@ -844,6 +849,22 @@ fn split_package(args: &str) -> (Option<&str>, String) {
     (package, rest.join(" "))
 }
 
+/// Take the build time, in seconds, from cargo's line "Finished `test`
+/// profile [unoptimized + debuginfo] target(s) in 1m 14s".
+fn build_time(line: &str) -> Option<f64> {
+    let rest = line.strip_prefix("Finished ")?;
+    let (_, time) = rest.rsplit_once(" target(s) in ")?;
+    // Cargo writes "29.84s" for less than a minute, and "1m 14s" after.
+    match time.split_once("m ") {
+        Some((minutes, seconds)) => {
+            let minutes: f64 = minutes.parse().ok()?;
+            let seconds: f64 = seconds.strip_suffix('s')?.parse().ok()?;
+            Some(minutes * 60.0 + seconds)
+        }
+        None => time.strip_suffix('s')?.parse().ok(),
+    }
+}
+
 /// Take "signal: 6, SIGABRT: process abort signal" from cargo's
 /// "process didn't exit successfully: `...` (signal: 6, ...)" line.
 fn exit_reason(line: &str) -> Option<String> {
@@ -983,6 +1004,40 @@ error: test failed, to rerun pass `-p beta --test api`
                 (Some("beta"), "test api", Status::Fail),
             ]
         );
+    }
+
+    #[test]
+    fn build_time_from_finished_line() {
+        let cases = [
+            (
+                "Finished `test` profile [unoptimized + debuginfo] target(s) in 0.00s",
+                Some(0.0),
+            ),
+            (
+                "Finished `test` profile [unoptimized] target(s) in 29.84s",
+                Some(29.84),
+            ),
+            (
+                "Finished `release` profile [optimized] target(s) in 1m 14s",
+                Some(74.0),
+            ),
+            (
+                "Finished `test` profile [unoptimized] target(s) in 74m 05s",
+                Some(4445.0),
+            ),
+            ("Finished something else", None),
+        ];
+        for (line, seconds) in cases {
+            assert_eq!(build_time(line), seconds, "{line}");
+        }
+        // A test that prints the line while it runs does not count.
+        let input = r#"    Finished `test` profile [unoptimized] target(s) in 2.50s
+{ "type": "suite", "event": "started", "test_count": 1 }
+    Finished `test` profile [unoptimized] target(s) in 9.00s
+{ "type": "test", "name": "works", "event": "ok" }
+{ "type": "suite", "event": "ok", "passed": 1, "failed": 0 }
+"#;
+        assert_eq!(parse(input).build_time, Some(2.5));
     }
 
     #[test]
