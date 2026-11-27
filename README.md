@@ -22,7 +22,7 @@ FAIL  t::fails  alpha-core lib
 │ PASS   │   0.00s │ beta       │ bin    │    1 │    0 │    0 │
 └────────┴─────────┴────────────┴────────┴──────┴──────┴──────┘
 
-3 passed, 1 failed, 0 skipped in 0.00s
+3 passed, 1 failed, 0 skipped in 0.00s (build 0.42s, total 0.61s)
 ```
 
 ## Install
@@ -78,6 +78,15 @@ set -o pipefail
 cargo +nightly test --no-fail-fast -- -Z unstable-options --format json 2>&1 \
   | cargo tparse --format markdown >> "$GITHUB_STEP_SUMMARY"
 ```
+
+## Times
+
+Cargo builds the code, then runs each test binary one at a time. In a binary, libtest runs the tests in parallel.
+
+- `Elapsed` in the tables, and the time after `in` on the totals line, is the time that libtest measured in each test binary. It does not count the build, the start of each binary, or the time that rustdoc needs before it runs doc tests.
+- `build` is the time from cargo's `Finished` line.
+- `total` is the time from the start of `cargo tparse` to the end of cargo's output, so it counts everything. It shows only when `cargo tparse` reads cargo's output live from a pipe, not for saved output.
+- With `--slow`, the time of each test can overlap with other tests, because tests run in parallel.
 
 ## Limits
 

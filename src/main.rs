@@ -6,6 +6,7 @@ mod render;
 use std::ffi::OsString;
 use std::io::{self, BufRead, IsTerminal, Write};
 use std::process::ExitCode;
+use std::time::Instant;
 
 use anstream::{AutoStream, ColorChoice};
 use clap::{Parser as _, ValueEnum};
@@ -87,6 +88,8 @@ fn main() -> ExitCode {
 
 /// Run returns false when a target failed or the input has no test events.
 fn run(args: &Args) -> io::Result<bool> {
+    // Cargo and cargo tparse start at the same time in a pipe.
+    let start = Instant::now();
     let stdin = io::stdin();
     if stdin.is_terminal() {
         return Err(io::Error::other(format!(
@@ -124,9 +127,26 @@ fn run(args: &Args) -> io::Result<bool> {
             SortArg::Elapsed => Sort::Elapsed,
         },
         slow: args.slow,
+        total: is_pipe(&stdin).then(|| start.elapsed().as_secs_f64()),
     };
     stdout.write_all(render::report(&report, options).as_bytes())?;
     Ok(!report.failed())
+}
+
+/// Input from a pipe can be a live cargo run. Input from a file is saved
+/// output, so its total time means nothing.
+#[cfg(unix)]
+fn is_pipe(stdin: &io::Stdin) -> bool {
+    use std::os::fd::AsFd;
+    use std::os::unix::fs::FileTypeExt;
+    let file = stdin.as_fd().try_clone_to_owned().map(std::fs::File::from);
+    file.and_then(|f| f.metadata())
+        .is_ok_and(|m| m.file_type().is_fifo())
+}
+
+#[cfg(not(unix))]
+fn is_pipe(_stdin: &io::Stdin) -> bool {
+    false
 }
 
 fn read(mut input: impl BufRead, progress: bool, stdout: &mut impl Write) -> io::Result<Report> {

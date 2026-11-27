@@ -449,3 +449,47 @@ fn progress_lines_have_guessed_package_names() {
     assert!(text.contains("\nPASS   alpha_core lib  0.01s\n"), "{text}");
     assert!(text.contains("\nPASS   delta bin delta  0.03s\n"), "{text}");
 }
+
+#[test]
+fn totals_show_build_time_but_no_total_for_a_file() {
+    let path = format!(
+        "{}/tests/testdata/workspace.txt",
+        env!("CARGO_MANIFEST_DIR")
+    );
+    let output = Command::new(env!("CARGO_BIN_EXE_cargo-tparse"))
+        .stdin(std::fs::File::open(path).unwrap())
+        .output()
+        .unwrap();
+    let text = stdout(&output);
+    assert!(
+        text.contains("\n3 passed, 1 failed, 0 skipped in 0.00s (build 0.00s)\n"),
+        "{text}"
+    );
+}
+
+#[test]
+fn totals_show_total_time_for_a_live_pipe() {
+    let mut child = Command::new(env!("CARGO_BIN_EXE_cargo-tparse"))
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .spawn()
+        .unwrap();
+    let mut stdin = child.stdin.take().unwrap();
+    stdin
+        .write_all(fixture("workspace.txt").as_bytes())
+        .unwrap();
+    // The run goes on for a while after its last line.
+    std::thread::sleep(std::time::Duration::from_millis(300));
+    drop(stdin);
+    let text = stdout(&child.wait_with_output().unwrap());
+    let (_, rest) = text.split_once("(build 0.00s, total ").expect(&text);
+    let total: f64 = rest.split_once("s)").unwrap().0.parse().unwrap();
+    assert!(total >= 0.3, "{text}");
+}
+
+#[test]
+fn totals_show_no_total_for_saved_output_in_a_pipe() {
+    // The tests took 0.31s, so input that ends sooner is saved output.
+    let text = stdout(&run(&fixture("single.txt"), &[]));
+    assert!(text.contains(" in 0.31s (build 0.00s)\n"), "{text}");
+}
